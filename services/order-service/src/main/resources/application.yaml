@@ -1,0 +1,90 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: order-service
+  datasource:
+    url: jdbc:postgresql://localhost:5433/orderdb
+    username: postgres
+    password: zealow139
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 25
+          order_inserts: true
+          order_updates: true
+  kafka:
+    bootstrap-servers: localhost:9092
+    topic:
+      order-events: order-events
+    consumer:
+      group-id: order-group
+      auto-offset-reset: earliest
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+
+restaurant:
+  service:
+    url: http://restaurant-service:8082
+
+payment:
+  service:
+    url: http://payment-service:8084
+    timeout: 5000
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      restaurantService:
+        register-health-indicator: true
+        failure-rate-threshold: 50
+        minimum-number-of-calls: 5
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+  retry:
+    instances:
+      paymentService:
+        max-attempts: 3
+        wait-duration: 100ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: always
+    metrics:
+      access: read_only
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+
+logging:
+  level:
+    org.springframework: INFO
+    org.codewithzea: DEBUG
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_USERNAME:admin}:${EUREKA_PASSWORD:zealow139}@localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+    healthcheck:
+      enabled: true
+  instance:
+    prefer-ip-address: true

@@ -1,0 +1,59 @@
+spring:
+  application:
+    name:
+      notification-service
+  datasource:
+    url: jdbc:postgresql://localhost:5433/notificationdb
+    username: postgres
+    password: zealow139
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASS:guest}
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1000ms
+          multiplier: 2
+          max-interval: 10000ms
+  mail:
+    host: smtp.gmail.com  # e.g., smtp.gmail.com
+    port: 587
+    username: yfrimps13@gmail.com
+    password: zealow@139
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls.enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+notification:
+  retry:
+    max-attempts: 3
+    initial-interval: 1000
+    multiplier: 2
+    max-interval: 10000
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://${EUREKA_USERNAME:admin}:${EUREKA_PASSWORD:zealow139}@localhost:8761/eureka/
+    register-with-eureka: true
+    fetch-registry: true
+    healthcheck:
+      enabled: true
+  instance:
+    prefer-ip-address: true

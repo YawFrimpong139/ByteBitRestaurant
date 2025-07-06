@@ -1,0 +1,18 @@
+package org.codewithzea.orderservice.model;
+
+
+
+public enum OrderStatus {
+    CREATED,
+    VALIDATED,
+    PAYMENT_PENDING,
+    PAYMENT_COMPLETED,
+    PAYMENT_FAILED,
+    RESTAURANT_CONFIRMED,
+    RESTAURANT_REJECTED,
+    PREPARING,
+    READY_FOR_DELIVERY,
+    OUT_FOR_DELIVERY,
+    DELIVERED,
+    CANCELLED
+}

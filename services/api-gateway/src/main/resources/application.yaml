@@ -1,0 +1,76 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      server:
+        webflux:
+          discovery:
+            locator:
+              lower-case-service-id: true
+              enabled: true
+          routes:
+            - id: auth-service
+              uri: lb://auth-service
+              predicates:
+                 - Path=/api/auth/**
+              filters:
+                 - StripPrefix=1
+                 - name: CircuitBreaker
+                   args:
+                      name: AuthServiceCB
+                      fallbackUri: forward:/fallback/auth
+            - id: restaurant-service
+              uri: lb://restaurant-service
+              predicates:
+                 - Path=/api/restaurants/**
+              filters:
+                 - StripPrefix=1
+                 - name: RequestRateLimiter
+                   args:
+                      redis-rate-limiter.replenishRate: 10
+                      redis-rate-limiter.burstCapacity: 20
+            - id: order-service
+              uri: lb://order-service
+              predicates:
+                 - Path=/api/orders/**
+              filters:
+                 - StripPrefix=1
+          default-filters:
+            - DedupeResponseHeader=Access-Control-Allow-Origin
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://auth-service:8080/auth/realms/bytebites
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+eureka:
+  client:
+    service-url:
+      defaultZone: http://discovery-server:8761/eureka/
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      AuthServiceCB:
+        register-health-indicator: true
+        failure-rate-threshold: 50
+        minimum-number-of-calls: 5
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, metrics, gateway
+  endpoint:
+    health:
+      show-details: always

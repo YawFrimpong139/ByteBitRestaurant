@@ -1,0 +1,19 @@
+spring:
+  profiles:
+    active: native
+  application:
+    name: config-server
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath://configurations
+  security:
+    user:
+      name: admin
+      password: zealow139
+
+server:
+  port: 8888
+
+
