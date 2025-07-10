@@ -42,6 +42,11 @@ public class Restaurant {
     @Column(nullable = false)
     private String ownerId; // Linked to auth-service user ID
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private RestaurantStatus status = RestaurantStatus.PENDING_VERIFICATION;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 

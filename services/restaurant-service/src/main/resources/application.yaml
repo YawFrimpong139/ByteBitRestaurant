@@ -9,6 +9,8 @@ spring:
     type: redis
     redis:
       time-to-live: 60000
+  main:
+    allow-bean-definition-overriding: true
   data:
     redis:
       host: localhost
@@ -60,11 +62,41 @@ management:
     metrics:
       export:
         enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 logging:
   level:
-    org.springframework: INFO
+    root: INFO
     org.codewithzea: DEBUG
+    org.springframework.web: WARN
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.springframework.security: WARN
+
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+  file:
+    name: logs/${spring.application.name}.log
+
+
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 7
+      total-size-cap: 100MB
+
+
+  # Logstash JSON logging configuration
+  logstash:
+    enabled: true
+    encoder:
+      custom-fields: '{"app":"${spring.application.name}","env":"${spring.profiles.active:local}"}'
+      include-context: false
+      time-zone: UTC
 
 server:
   port: 8082

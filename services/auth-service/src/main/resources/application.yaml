@@ -25,6 +25,7 @@ spring:
 
 auth:
   jwt:
+    secret: d8e9945d834b072cb62ee7f15441031879d27c52fdfc7b5e04e28d32db1f122a # 256-bit (32 chars) minimum
     expiration: 86400000 # 24 hours in ms
     refresh-expiration: 604800000 # 7 days in ms
 

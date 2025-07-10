@@ -3,10 +3,14 @@ package org.codewithzea.restaurantservice.exception;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import lombok.NonNull;
+import lombok.extern.slf4j.Slf4j;
+import org.codewithzea.restaurantservice.dto.response.ErrorResponse;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -14,27 +18,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
-    // Standard Exception Format
-    private Map<String, Object> createErrorBody(HttpStatus status, String message) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("timestamp", LocalDateTime.now());
-        body.put("status", status.value());
-        body.put("error", status.getReasonPhrase());
-        body.put("message", message);
-        return body;
-    }
-
-    // 400 - Bad Request (Validation Errors)
     @Override
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             @NonNull MethodArgumentNotValidException ex,
@@ -42,119 +33,176 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
             @NonNull HttpStatusCode status,
             @NonNull WebRequest request) {
 
-        Map<String, Object> body = createErrorBody(HttpStatus.BAD_REQUEST, "Validation errors");
+        log.warn("Validation error: {}", ex.getMessage());
 
-        // Collect field errors
         List<String> errors = ex.getBindingResult()
                 .getFieldErrors()
                 .stream()
-                .map(FieldError::getDefaultMessage)
+                .map(this::formatFieldError)
                 .collect(Collectors.toList());
 
-        body.put("errors", errors);
-        return new ResponseEntity<>(body, headers, status);
+        return ResponseEntity.badRequest().body(
+                ErrorResponse.of(
+                        HttpStatus.BAD_REQUEST,
+                        "Validation failed",
+                        request.getDescription(false),
+                        errors,
+                        "VALIDATION_ERROR"
+                )
+        );
     }
 
-    // 400 - Constraint Violation
+    @Override
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(
+            @NonNull HttpMessageNotReadableException ex,
+            @NonNull HttpHeaders headers,
+            @NonNull HttpStatusCode status,
+            @NonNull WebRequest request) {
+
+        log.warn("Malformed request: {}", ex.getMessage());
+        return ResponseEntity.badRequest().body(
+                ErrorResponse.of(
+                        HttpStatus.BAD_REQUEST,
+                        "Malformed request body",
+                        request.getDescription(false),
+                        List.of(ex.getMostSpecificCause().getMessage()),
+                        "MALFORMED_REQUEST"
+                )
+        );
+    }
+
     @ExceptionHandler(ConstraintViolationException.class)
-    public ResponseEntity<Object> handleConstraintViolation(
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(
             ConstraintViolationException ex, WebRequest request) {
 
-        Map<String, Object> body = createErrorBody(HttpStatus.BAD_REQUEST, "Constraint violations");
+        log.warn("Constraint violation: {}", ex.getMessage());
 
-        Set<ConstraintViolation<?>> violations = ex.getConstraintViolations();
-        List<String> errors = violations.stream()
-                .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+        List<String> errors = ex.getConstraintViolations()
+                .stream()
+                .map(this::formatConstraintViolation)
                 .collect(Collectors.toList());
 
-        body.put("errors", errors);
-        return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
-    }
-
-    // 404 - Restaurant Not Found
-    @ExceptionHandler(RestaurantNotFoundException.class)
-    public ResponseEntity<Object> handleRestaurantNotFound(
-            RestaurantNotFoundException ex, WebRequest request) {
-        return new ResponseEntity<>(
-                createErrorBody(HttpStatus.NOT_FOUND, ex.getMessage()),
-                HttpStatus.NOT_FOUND
+        return ResponseEntity.badRequest().body(
+                ErrorResponse.of(
+                        HttpStatus.BAD_REQUEST,
+                        "Constraint violations",
+                        request.getDescription(false),
+                        errors,
+                        "CONSTRAINT_VIOLATION"
+                )
         );
     }
 
-    // 404 - Menu Item Not Found
-    @ExceptionHandler(MenuItemNotFoundException.class)
-    public ResponseEntity<Object> handleMenuItemNotFound(
-            MenuItemNotFoundException ex, WebRequest request) {
-        return new ResponseEntity<>(
-                createErrorBody(HttpStatus.NOT_FOUND, ex.getMessage()),
-                HttpStatus.NOT_FOUND
+    @ExceptionHandler({
+            RestaurantNotFoundException.class,
+            MenuItemNotFoundException.class
+    })
+    public ResponseEntity<ErrorResponse> handleNotFoundExceptions(
+            RuntimeException ex, WebRequest request) {
+
+        log.info("Resource not found: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                ErrorResponse.of(
+                        HttpStatus.NOT_FOUND,
+                        ex.getMessage(),
+                        request.getDescription(false)
+                )
         );
     }
 
-    // 403 - Unauthorized Access
-    @ExceptionHandler(UnauthorizedAccessException.class)
-    public ResponseEntity<Object> handleUnauthorizedAccess(
-            UnauthorizedAccessException ex, WebRequest request) {
-        return new ResponseEntity<>(
-                createErrorBody(HttpStatus.FORBIDDEN, ex.getMessage()),
-                HttpStatus.FORBIDDEN
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(
+            AccessDeniedException ex, WebRequest request) {
+
+        log.warn("Access denied: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+                ErrorResponse.of(
+                        HttpStatus.FORBIDDEN,
+                        "Access denied",
+                        request.getDescription(false),
+                        List.of(ex.getMessage()),
+                        "ACCESS_DENIED"
+                )
         );
     }
 
-    // 409 - Menu Item Not in Restaurant
-    @ExceptionHandler(MenuItemNotInRestaurantException.class)
-    public ResponseEntity<Object> handleMenuItemNotInRestaurant(
-            MenuItemNotInRestaurantException ex, WebRequest request) {
-        return new ResponseEntity<>(
-                createErrorBody(HttpStatus.CONFLICT, ex.getMessage()),
-                HttpStatus.CONFLICT
+    @ExceptionHandler({
+            MenuItemNotInRestaurantException.class,
+            MenuOptimisticLockException.class
+    })
+    public ResponseEntity<ErrorResponse> handleConflictExceptions(
+            RuntimeException ex, WebRequest request) {
+
+        log.warn("Conflict detected: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                ErrorResponse.of(
+                        HttpStatus.CONFLICT,
+                        ex.getMessage(),
+                        request.getDescription(false)
+                )
         );
     }
 
-    // 409 - Optimistic Locking
-    @ExceptionHandler(MenuOptimisticLockException.class)
-    public ResponseEntity<Object> handleOptimisticLock(
-            MenuOptimisticLockException ex, WebRequest request) {
-        return new ResponseEntity<>(
-                createErrorBody(HttpStatus.CONFLICT, ex.getMessage()),
-                HttpStatus.CONFLICT
-        );
-    }
-
-    // 422 - Custom Validation
     @ExceptionHandler(MenuValidationException.class)
-    public ResponseEntity<Object> handleMenuValidation(
+    public ResponseEntity<ErrorResponse> handleMenuValidation(
             MenuValidationException ex, WebRequest request) {
 
-        Map<String, Object> body = createErrorBody(
-                HttpStatus.UNPROCESSABLE_ENTITY,
-                ex.getMessage()
+        log.warn("Business validation failed: {}", ex.getMessage());
+
+        List<String> errors = ex.getViolations() != null ?
+                ex.getViolations().stream()
+                        .map(this::formatConstraintViolation)
+                        .collect(Collectors.toList()) :
+                null;
+
+        return ResponseEntity.unprocessableEntity().body(
+                ErrorResponse.of(
+                        HttpStatus.UNPROCESSABLE_ENTITY,
+                        ex.getMessage(),
+                        request.getDescription(false),
+                        errors,
+                        "BUSINESS_VALIDATION"
+                )
         );
-
-        if (ex.getViolations() != null) {
-            List<String> errors = ex.getViolations().stream()
-                    .map(v -> v.getPropertyPath() + ": " + v.getMessage())
-                    .collect(Collectors.toList());
-            body.put("errors", errors);
-        }
-
-        return new ResponseEntity<>(body, HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
-    // 500 - All Other Exceptions
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Object> handleGlobalException(
+    public ResponseEntity<ErrorResponse> handleGlobalException(
             Exception ex, WebRequest request) {
 
-        String message = "An unexpected error occurred";
-        // Don't expose internal details in production
-        if (request.getUserPrincipal() != null) { // Debug mode for admins
-            message += ": " + ex.getMessage();
-        }
-
-        return new ResponseEntity<>(
-                createErrorBody(HttpStatus.INTERNAL_SERVER_ERROR, message),
-                HttpStatus.INTERNAL_SERVER_ERROR
+        log.error("Unexpected error occurred", ex);
+        return ResponseEntity.internalServerError().body(
+                ErrorResponse.of(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "An unexpected error occurred",
+                        request.getDescription(false),
+                        isDebugMode(request) ? List.of(ex.getMessage()) : null,
+                        "INTERNAL_ERROR"
+                )
         );
+    }
+
+    private String formatFieldError(FieldError error) {
+        return String.format("%s: %s (rejected value: %s)",
+                error.getField(),
+                error.getDefaultMessage(),
+                error.getRejectedValue() != null ?
+                        error.getRejectedValue().toString() : "null");
+    }
+
+    private String formatConstraintViolation(ConstraintViolation<?> violation) {
+        return String.format("%s: %s (invalid value: %s)",
+                lastPathSegment(violation.getPropertyPath().toString()),
+                violation.getMessage(),
+                violation.getInvalidValue() != null ?
+                        violation.getInvalidValue().toString() : "null");
+    }
+
+    private String lastPathSegment(String path) {
+        return path.substring(path.lastIndexOf('.') + 1);
+    }
+
+    private boolean isDebugMode(WebRequest request) {
+        return false; // Implement based on your environment
     }
 }

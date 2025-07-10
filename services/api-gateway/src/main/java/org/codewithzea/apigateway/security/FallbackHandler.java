@@ -1,4 +1,5 @@
-package org.codewithzea.configserver.security;
+package org.codewithzea.apigateway.security;
+
 
 
 import org.springframework.http.HttpStatus;

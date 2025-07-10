@@ -3,10 +3,8 @@ package org.codewithzea.restaurantservice.dto.request;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
-import lombok.Builder;
 
-@Builder
-public record RestaurantRequest(
+public record CreateRestaurantRequest(
         @NotBlank(message = "Restaurant name cannot be blank")
         @Size(min = 2, max = 100, message = "Name must be between 2-100 characters")
         String name,
@@ -24,14 +22,13 @@ public record RestaurantRequest(
         String phone,
 
         @NotNull(message = "Address cannot be null")
-        @Valid  // Ensures AddressRequest's validations are also checked
+        @Valid
         AddressRequest address
 ) {
-    // Compact constructor for additional validation/processing
-    public RestaurantRequest {
+    // Compact constructor for normalization
+    public CreateRestaurantRequest {
         name = name != null ? name.trim() : null;
         email = email != null ? email.trim().toLowerCase() : null;
         phone = phone != null ? phone.replaceAll("[\\s()-]", "") : null;
     }
 }
-
