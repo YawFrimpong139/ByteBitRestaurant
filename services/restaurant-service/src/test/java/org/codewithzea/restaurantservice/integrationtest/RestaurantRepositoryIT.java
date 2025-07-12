@@ -1,6 +1,5 @@
 package org.codewithzea.restaurantservice.integrationtest;
 
-import com.github.dockerjava.zerodep.shaded.org.apache.hc.core5.reactor.IOSession;
 //import org.apache.hc.core5.reactor.IOSession;
 import lombok.extern.slf4j.Slf4j;
 import org.codewithzea.restaurantservice.model.Address;
@@ -10,7 +9,6 @@ import org.codewithzea.restaurantservice.repository.RestaurantRepository;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.rocksdb.Status;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
